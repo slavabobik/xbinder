@@ -2,7 +2,6 @@ package binder
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -11,65 +10,81 @@ import (
 
 const defaultSeparator = ","
 
-//TODO add comment
-func BindFromQuery(source url.Values, v interface{}) error {
-	value := reflect.ValueOf(v).Elem()
+// FromQuery...
+func FromQuery(dst interface{}, src url.Values) error {
+	v := reflect.ValueOf(dst)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("invalid interface type")
+	}
 
-	for i := 0; i < value.NumField(); i++ {
-		tag, ok := value.Type().Field(i).Tag.Lookup("json")
+	rValue := reflect.ValueOf(dst).Elem()
+	rType := rValue.Type()
+
+	for i := 0; i < rValue.NumField(); i++ {
+		tag, ok := rType.Field(i).Tag.Lookup("json")
 		if !ok || tag == "" || tag == "-" {
 			continue
 		}
 
-		queryParamValue := source.Get(tag)
+		queryParamValue := src.Get(tag)
 		if queryParamValue == "" {
 			continue
 		}
 
-		switch value.Field(i).Interface().(type) {
-		case int:
+		fld := rValue.Field(i)
+		if !fld.CanSet() {
+			return fmt.Errorf("field %s is not addressable", rType.Field(i).Name)
+		}
+
+		switch fld.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			p, err := strconv.Atoi(queryParamValue)
 			if err != nil {
 				return err
 			}
-			value.Field(i).SetInt(int64(p))
-		case string:
-			value.Field(i).SetString(queryParamValue)
-		case bool:
-			if queryParamValue == "true" {
-				value.Field(i).SetBool(true)
+			fld.SetInt(int64(p))
+		case reflect.String:
+			fld.SetString(queryParamValue)
+		case reflect.Bool:
+			if strings.ToLower(queryParamValue) == "true" {
+				fld.SetBool(true)
 			}
-		case []int:
-			values := strings.Split(queryParamValue, defaultSeparator)
+		case reflect.Slice:
+			var values []string
+			for _, v := range strings.Split(queryParamValue, defaultSeparator) {
+				if v == "" {
+					continue
+				}
+				values = append(values, v)
+			}
+
 			if len(values) == 0 {
 				continue
 			}
-			//TODO remove duplicate code
-			value.Field(i).Set(reflect.MakeSlice(value.Field(i).Type(), len(values), len(values)))
-			for idx, s := range values {
-				n, err := strconv.Atoi(s)
-				if err != nil {
-					return err
+
+			dst := reflect.MakeSlice(fld.Type(), len(values), len(values))
+			switch fld.Interface().(type) {
+			case []int:
+				var vs []int
+				for _, s := range values {
+					n, err := strconv.Atoi(s)
+					if err != nil {
+						return fmt.Errorf("can't parse value: %s", s)
+					}
+					vs = append(vs, n)
 				}
 
-				value.Field(i).Index(idx).Set(reflect.ValueOf(n))
+				reflect.Copy(dst, reflect.ValueOf(vs))
+			case []string:
+				reflect.Copy(dst, reflect.ValueOf(values))
+			default:
+				return fmt.Errorf("unsupported slice type")
 			}
+			fld.Set(dst)
 
-		case []string:
-			values := strings.Split(queryParamValue, defaultSeparator)
-			if len(values) == 0 {
-				continue
-			}
-			value.Field(i).Set(reflect.MakeSlice(value.Field(i).Type(), len(values), len(values)))
-			for idx, s := range values {
-				value.Field(i).Index(idx).Set(reflect.ValueOf(s))
-			}
-
-			log.Println(queryParamValue)
 		default:
-			return fmt.Errorf("unsupported type")
+			return fmt.Errorf("%s unsupported type", fld.Type())
 		}
 	}
-
 	return nil
 }

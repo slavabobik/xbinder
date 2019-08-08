@@ -1,44 +1,89 @@
 package binder
 
 import (
+	"log"
 	"reflect"
 	"testing"
 )
 
-func TestBindFromQuery(t *testing.T) {
-	type test struct {
-		StrField        string `json:"str_field"`
-		IntField        int    `json:"int_field"`
-		FieldWithoutTag int
-		IntSliceField   []int    `json:"int_slice_field"`
-		StrSliceField   []string `json:"str_slice_field"`
-		BoolField       bool     `json:"bool_field"`
+func TestFromQuery_Bind(t *testing.T) {
+	type s struct {
+		Int             int    `json:"int"`
+		Int8            int8   `json:"int_8"`
+		Int16           int16  `json:"int_16"`
+		Int32           int32  `json:"int_32"`
+		Int64           int64  `json:"int_64"`
+		String          string `json:"string"`
+		Bool            bool   `json:"bool"`
+		CapitalizedBool bool   `json:"capitalized_bool"`
 	}
 
-	expected := test{
-		StrField:      "some string",
-		IntField:      10,
-		IntSliceField: []int{1, 2, 3, 4, 5},
-		StrSliceField: []string{"one", "two"},
-		BoolField:     true,
+	want := s{
+		Int:             4,
+		Int8:            8,
+		Int16:           16,
+		Int32:           32,
+		Int64:           64,
+		String:          "value",
+		Bool:            true,
+		CapitalizedBool: true,
 	}
 
-	source := map[string][]string{}
-	source["int_field"] = []string{"10"}
-	source["str_field"] = []string{"some string"}
-	source["int_slice_field"] = []string{"1,2,3,4,5"}
-	source["str_slice_field"] = []string{"one,two"}
-	source["bool_field"] = []string{"true"}
+	query := map[string][]string{
+		"int":              {"4"},
+		"int_8":            {"8"},
+		"int_16":           {"16"},
+		"int_32":           {"32"},
+		"int_64":           {"64"},
+		"string":           {"value"},
+		"bool":             {"true"},
+		"capitalized_bool": {"True"},
+	}
 
-	var actual test
-
-	err := BindFromQuery(source, &actual)
+	var got s
+	err := FromQuery(&got, query)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected not equal expected \n %+v \n %+v", expected, actual)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("unexpected value, got:%+v, want:%+v", got, want)
 	}
-	//TODO provide more tests
+}
+
+func TestFromQuery_BindSlice(t *testing.T) {
+	type s struct {
+		IntSlice         []int    `json:"int_slice"`
+		StringSlice      []string `json:"string_slice"`
+		MissedValueSlice []int    `json:"missed_value_slice"`
+	}
+
+	want := s{
+		IntSlice:         []int{1, 2, 3, 4},
+		StringSlice:      []string{"one", "two"},
+		MissedValueSlice: []int{1, 3, 4},
+	}
+
+	query := map[string][]string{
+		"int_slice":          {"1,2,3,4"},
+		"string_slice":       {"one,two", "three"},
+		"missed_value_slice": {"1,,3,4,"},
+	}
+
+	var got s
+	err := FromQuery(&got, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("unexpected value, got:%+v, want:%+v", got, want)
+	}
+}
+
+func TestFromQuery_BindError(t *testing.T) {
+	err1 := FromQuery(struct{}{}, map[string][]string{})
+	if err1 == nil || err1.Error() != "invalid interface type" {
+		log.Fatal("no expected error")
+	}
 }
