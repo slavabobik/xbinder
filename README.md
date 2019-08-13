@@ -10,22 +10,21 @@ go get -u github.com/slavabobik/xbinder
 
 ## Example 
 ```go
-
 type Pet struct {
-    Name  string
-    Age int
-    Hobbies []string
+	Name    string
+	Age     int
+	Hobbies []string
 }
 
 func MyHandler(w http.ResponseWriter, r *http.Request) {
-    //for e.g. you have a query http://example.com?name=snowball&age=2&hobbies=eat,sleep,repeat
-    values := r.URL.Query()
+	//for e.g. you have a query http://example.com?name=snowball&age=2&hobbies=eat,sleep,repeat
+	values := r.URL.Query()
 
-    var pet Pet
-    err := xbinder.FromQuery(&pet,values)
-    if err != nil {
-        // Handle error
-    }
+	var pet Pet
+	err := xbinder.FromQuery(&pet, values)
+	if err != nil {
+		// Handle error
+	}
 }
 ```
 
