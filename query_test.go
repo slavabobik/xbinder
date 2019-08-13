@@ -1,8 +1,8 @@
 package binder
 
 import (
-	"log"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -81,9 +81,95 @@ func TestFromQuery_BindSlice(t *testing.T) {
 	}
 }
 
-func TestFromQuery_BindError(t *testing.T) {
-	err1 := FromQuery(struct{}{}, map[string][]string{})
-	if err1 == nil || err1.Error() != "invalid interface type" {
-		log.Fatal("no expected error")
+func TestFromQuery_BindIntSliceError(t *testing.T) {
+	query := map[string][]string{"f": {"str"}}
+	s := struct {
+		F []int `json:"f"`
+	}{}
+
+	err := FromQuery(&s, query)
+	if err == nil {
+		t.Fatal("no error")
 	}
+
+	if err.Error() != "can't parse value: str" {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+}
+
+func TestFromQuery_BindError_UnaddressableField(t *testing.T) {
+	query := map[string][]string{"f": {"str"}}
+	s := struct {
+		f []int `json:"f"`
+	}{}
+
+	err := FromQuery(&s, query)
+	if err == nil {
+		t.Fatal("no error")
+	}
+
+	if err.Error() != "field f is not addressable" {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+}
+
+func TestFromQuery_BindTypeError(t *testing.T) {
+	err := FromQuery(struct{}{}, map[string][]string{})
+	if err == nil || err.Error() != "invalid interface type" {
+		t.Fatal("no expected error")
+	}
+}
+
+func TestFromQuery_UnsupportedTypes(t *testing.T) {
+	f := func(s interface{}) {
+		t.Helper()
+		err := FromQuery(s, map[string][]string{"f": {"1"}})
+		if err == nil {
+			t.Fatal("no error")
+		}
+
+		if !strings.Contains(err.Error(), "unsupported type") {
+			t.Fatalf("no expected error: %#v", err)
+		}
+	}
+
+	s1 := struct {
+		F uint `json:"f"`
+	}{}
+	f(&s1)
+
+	s2 := struct {
+		F uint8 `json:"f"`
+	}{}
+	f(&s2)
+
+	s3 := struct {
+		F uint16 `json:"f"`
+	}{}
+	f(&s3)
+
+	s4 := struct {
+		F uint32 `json:"f"`
+	}{}
+	f(&s4)
+
+	s5 := struct {
+		F uint64 `json:"f"`
+	}{}
+	f(&s5)
+
+	s6 := struct {
+		F float32 `json:"f"`
+	}{}
+	f(&s6)
+
+	s7 := struct {
+		F float64 `json:"f"`
+	}{}
+	f(&s7)
+
+	s8 := struct {
+		F *int `json:"f"`
+	}{}
+	f(&s8)
 }
