@@ -1,8 +1,9 @@
 xbinder
 =======
 
-Bind your struct from http query params
+[![codecov](https://codecov.io/gh/SlavaBobik/xbinder/branch/master/graph/badge.svg)](https://codecov.io/gh/SlavaBobik/xbinder)  
 
+Bind your struct from http query params  
 ## Install
 ```
 go get -u github.com/slavabobik/xbinder
